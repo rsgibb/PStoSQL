@@ -2,79 +2,191 @@
 .SYNOPSIS
     Converts parameters to SQL script
 .DESCRIPTION
-    Converts parameters to SQL script 
+    Converts PowerShell parameters to SQL script for basic CRUD operations
 .EXAMPLE
-    Convert-PStoSQL -Select 'User' -Where {
-        UserId -eq 'howler'
+    Convert-PStoSQL -Select UserId,Firstname,Surname -From tblUser -Where {
+        UserId -eq 'rsgibb'
     }
-    Selects a user from the table user where UserId = 'howler'
+    Outputs SQL query that will selects 3 columns from the table tblUser where UserId = 'rsgibb'
 .INPUTS
-    [string]$Select
-    [string]$Insert
-    [string]$Update
-    [string]$Delete
 .OUTPUTS
-    [string] SQLCommand
+    SQL query/statement
 .NOTES
     ...
+#>
+
+<#
+TODO
+ * Support arrays for IN (...) operator
+ * Quote and escape values in $Set and $Values
+ * Propably other things to make this more 'complete'
 #>
 
 function Convert-PStoSQL {
     [CmdletBinding(DefaultParameterSetName = 'Select')]
     param(
-        # SELECT (FROM) <table>
+        # SELECT <column, ...> 
         [Parameter(
             ParameterSetName = 'Select',
-            Position = 0
-
+            Position = 0,
+            Mandatory = $true
         )]
-        [string]$Select,    
-        # INSERT (INTO) <table>
+        [ValidateNotNullOrEmpty()]
+        [string[]]
+        $Select, 
+
+        # FROM <table>
+        [Parameter(
+            ParameterSetName = 'Select',
+            Position = 1,
+            Mandatory = $true
+        )]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $From,
+        
+        # INSERT INTO <table>
         [Parameter(
             ParameterSetName = 'Insert',
             Position = 0
-
         )]
-        [string]$Insert,    
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $InsertInto,    
+
+        # VALUES
+        [Parameter(
+            ParameterSetName = 'Insert',
+            Position = 1,
+            Mandatory = $true
+        )]
+        [hashtable]
+        $Values,
+        
         # UPDATE <table>
         [Parameter(
             ParameterSetName = 'Update',
             Position = 0
-
         )]
-        [string]$Update,    
-        # DELETE (FROM) <table>
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $Update,
+        
+        # SET <key> = <value>
+        [Parameter(
+            ParameterSetName = 'Update',
+            Position = 1,
+            Mandatory = $true
+        )]
+        [hashtable]
+        $Set,
+
+        # DELETE FROM <table>
         [Parameter(
             ParameterSetName = 'Delete',
             Position = 0
+        )]
+        [ValidateNotNullOrEmpty()]
+        [string]
+        $DeleteFrom,
 
-        )]
-        [string]$Delete,    
-    
-    
-        # The SQL command (select, insert, update, delete)
-        [Parameter(
-            Mandatory = $true
-        )]
-        [ValidateSet('Select', 'Insert', 'Update', 'Delete')]
-        [string]$Command,
-        # The table
-        [Parameter()]
-        [ValidateNotNullOrEmpty]
-        [string]$Table,
         # Where cause in script block to convert to SQL
         [Parameter(
+            ParameterSetName = 'Select',
+            Position = 2,
             Mandatory = $true
         )]
-        [ValidateNotNullOrEmpty]
-        [ScriptBlock]$Where
+        [Parameter(
+            ParameterSetName = 'Update',
+            Position = 2,
+            Mandatory = $true
+        )]
+        [Parameter(
+            ParameterSetName = 'Delete',
+            Position = 1,
+            Mandatory = $true
+        )]
+        [ScriptBlock]
+        $Where
     )
 
-    $sql = 
-
-    $tokens = [System.Management.Automation.PSParser]::Tokenize($Where, [ref]$null)
-
-    $whereSql = foreach ($token in $tokens) {
-
+    $operatorMap = @{
+        '-eq'  = '='
+        '-ne'  = '!='
+        '-gt'  = '>'
+        '-lt'  = '<'
+        '-ge'  = '>='
+        '-le'  = '<='
+        '-or'  = 'OR'
+        '-and' = 'AND'
+        '-not' = 'NOT'
+        '-in'  = 'IN'
     }
+
+    $tokenTypeSets = @{
+        Raw      = @(
+            'Command'
+            'CommandArgument'
+            'GroupStart'
+            'GroupEnd'
+            'Number'
+        )
+
+        Operator = @(
+            'Operator'
+            'CommandParameter'
+        )
+
+        Quoted   = @(
+            'String'
+        )
+    }
+
+    if ($Where) {
+        $tokens = [System.Management.Automation.PSParser]::Tokenize($Where, [ref]$null)
+        $whereSql = foreach ($token in $tokens) {
+            foreach ($kvp in $tokenTypeSets.GetEnumerator()) {
+                if ($token.Type -in $kvp.Value) {
+                    switch ($kvp.Key) {
+                        'Raw' { 
+                            $token.Content
+                        }
+                        'Operator' {
+                            $operatorMap[$token.Content]
+                        }
+                        'Quoted' {
+                            "'{0}'" -f $token.Content
+                        }
+                    }            
+                }
+            }
+        }
+    }
+
+    $sql = switch ($PSCmdlet.ParameterSetName) {
+        'Select' {
+            "SELECT`n  {0}" -f ($Select -join ",`n  " )
+            "FROM {0}" -f $From
+            "WHERE {0}" -f $whereSql
+        }
+
+        'Insert' {
+            "INSERT INTO {0} ({1})" -f $InsertInto, ($Values.Keys -join ',')
+            "VALUES ({2})" -f $Values.Values # TODO: Quote and excape 
+        }
+
+        'Update' {
+            "UPDATE {0}" -f $Update
+            "SET {0}" -f $Set.Keys
+            "WHERE {0}" -f $whereSql
+        }
+
+        'Delete' {
+            "DELETE FROM {0}" -f $DeleteFrom
+            "WHERE {0}" -f $whereSql
+        }
+    }
+
+    $sql -join "`n"
 }
+
