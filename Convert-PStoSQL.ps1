@@ -130,6 +130,7 @@ function Convert-PStoSQL {
             'GroupStart'
             'GroupEnd'
             'Number'
+            'Variable'
         )
 
         Operator = @(
@@ -141,6 +142,8 @@ function Convert-PStoSQL {
             'String'
         )
     }
+
+    $tokenSeperator = ' '
 
     if ($Where) {
         $tokens = [System.Management.Automation.PSParser]::Tokenize($Where, [ref]$null)
@@ -163,11 +166,12 @@ function Convert-PStoSQL {
         }
     }
 
+
     $sql = switch ($PSCmdlet.ParameterSetName) {
         'Select' {
-            "SELECT`n  {0}" -f ($Select -join ",`n  " )
+            "SELECT`n`  {0}" -f ($Select -join ",`n  ")
             "FROM {0}" -f $From
-            "WHERE {0}" -f $whereSql
+            "WHERE {0}" -f ($whereSql -join $tokenSeperator)
         }
 
         'Insert' {
@@ -177,16 +181,16 @@ function Convert-PStoSQL {
 
         'Update' {
             "UPDATE {0}" -f $Update
-            "SET {0}" -f $Set.Keys
-            "WHERE {0}" -f $whereSql
+            "SET {0}" -f ($Set.Keys -join ',') # TODO: Key & values
+            "WHERE {0}" -f ($whereSql -join $tokenSeperator)
         }
 
         'Delete' {
             "DELETE FROM {0}" -f $DeleteFrom
-            "WHERE {0}" -f $whereSql
+            "WHERE {0}" -f ($whereSql -join $tokenSeperator)
         }
     }
 
-    $sql -join "`n"
+    $sql -join [System.Environment]::NewLine
 }
 
