@@ -1,28 +1,70 @@
-<#
-.SYNOPSIS
-    Converts parameters to SQL script
-.DESCRIPTION
-    Converts PowerShell parameters to SQL script for basic CRUD operations
-.EXAMPLE
-    Convert-PStoSQL -Select UserId,Firstname,Surname -From tblUser -Where {
-        UserId -eq 'rsgibb'
-    }
-    Outputs SQL query that will selects 3 columns from the table tblUser where UserId = 'rsgibb'
-.INPUTS
-.OUTPUTS
-    SQL query/statement
-.NOTES
-    ...
-#>
 
-<#
-TODO
- * Support arrays for IN (...) operator
- * Quote and escape values in $Set and $Values
- * Propably other things to make this more 'complete'
-#>
 
 function Convert-PStoSQL {
+    <#
+    .SYNOPSIS
+        Converts parameters to SQL script
+
+    .DESCRIPTION
+        Converts PowerShell parameters to SQL script for basic CRUD operations
+
+    .PARAMETER Select
+        Columns to select from the table
+
+    .PARAMETER From
+        The table to select data from
+
+    .PARAMETER InsertInto
+        The table to insert data into
+
+    .PARAMETER Values
+        The values to insert into the table
+
+    .PARAMETER Update
+        The table to update
+
+    .PARAMETER Set
+        The values to update
+
+    .PARAMETER DeleteFrom
+        The table to delete from
+
+    .PARAMETER Where
+        The where clause written as a PowerShell ScriptBlock
+
+    .PARAMETER GroupBy
+        Teh column(s) to group by
+
+    .PARAMETER OrderBy
+        The coloumn(s) to order by
+
+    .EXAMPLE
+        Convert-PStoSQL -Select UserId,Firstname,Surname -From tblUser -Where { UserId -eq 'rsgibb' }
+        Outputs SQL query that will selects 3 columns from the table tblUser where UserId = 'rsgibb'
+
+    .EXAMPLE
+
+    .EXAMPLE
+
+    .EXAMPLE
+
+    .EXAMPLE
+
+    .OUTPUTS
+        System.String
+        SQL query/statement
+
+    .NOTES
+        ...
+    #>
+
+    <#
+    TODO
+    * Support arrays for IN (...) operator
+    * Quote and escape values in $Set and $Values
+    * Propably other things to make this more 'complete'
+    #>
+
     [CmdletBinding(DefaultParameterSetName = 'Select')]
     param(
         # SELECT <column, ...> 
@@ -94,7 +136,7 @@ function Convert-PStoSQL {
         [Parameter(
             ParameterSetName = 'Select',
             Position = 2,
-            Mandatory = $true
+            Mandatory = $false
         )]
         [Parameter(
             ParameterSetName = 'Update',
